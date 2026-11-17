@@ -100,6 +100,24 @@ describe('relationLabel', () => {
     expect(relationLabel(i, 'me', 'grand')).toBe('Great-nephew')
   })
 
+  test('names the partner of an aunt as an uncle', () => {
+    const commands: Command[] = [
+      { type: 'addPerson', person: { id: 'me', firstNames: 'Me' } },
+      { type: 'addPerson', person: { id: 'dad', firstNames: 'Dad' } },
+      { type: 'addPerson', person: { id: 'gran', firstNames: 'Gran' } },
+      { type: 'addPerson', person: { id: 'aunt', firstNames: 'Aunt', gender: 'female' } },
+      { type: 'addPerson', person: { id: 'uncle', firstNames: 'Uncle', gender: 'male' } },
+      { type: 'addParentLink', link: { childId: 'me', parentId: 'dad' } },
+      { type: 'addParentLink', link: { childId: 'dad', parentId: 'gran' } },
+      { type: 'addParentLink', link: { childId: 'aunt', parentId: 'gran' } },
+      { type: 'addPartnership', partnership: { personAId: 'aunt', personBId: 'uncle' } },
+    ]
+    const data = commands.reduce((d, c) => applyCommand(d, c).data, emptyTree({ name: 'T' }))
+    const i = buildIndex(data)
+    expect(relationLabel(i, 'me', 'aunt')).toBe('Aunt')
+    expect(relationLabel(i, 'me', 'uncle')).toBe('Uncle')
+  })
+
   test('uses neutral words when the gender is not known', () => {
     const people: [string, Gender][] = [
       ['me', 'unknown'],

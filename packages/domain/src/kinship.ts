@@ -172,6 +172,14 @@ export function relationLabel(index: TreeIndex, fromId: Id, toId: Id): string | 
     const name = degree === 1 ? 'Cousin' : `${ORDINAL[degree] ?? `${degree}th`} cousin`
     return removed ? `${name} ${TIMES[removed] ?? `${removed} times`} removed` : name
   }
+  for (const [ancestorId, a] of ancestorGen) {
+    if (a < 1) continue
+    for (const s of siblingsOf(index, ancestorId)) {
+      if (partnersOf(index, s.id).some((p) => p.partnerId === toId && !p.partnership?.ended)) {
+        return `${greats(a - 1)}${a > 1 ? lower(pick(W.uncle, g)) : pick(W.uncle, g)}`
+      }
+    }
+  }
   return null
 }
 

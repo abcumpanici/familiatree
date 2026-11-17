@@ -158,6 +158,95 @@ describe('hourglassLayout', () => {
     expectNoOverlap(layout)
   })
 
+  test('shows the siblings of ancestors with their families, on the outer side', () => {
+    const data = build(
+      person('me', '1996'),
+      person('wife', '1996'),
+      person('dad'),
+      person('mum'),
+      person('gran'),
+      person('aunt'),
+      person('auntman'),
+      person('auntmanmum'),
+      person('cousin'),
+      person('mil'),
+      person('wgran'),
+      person('wuncle'),
+      person('wcousin'),
+      person('ggran'),
+      person('granbro'),
+      parent('me', 'dad'),
+      parent('me', 'mum'),
+      parent('dad', 'gran'),
+      parent('aunt', 'gran'),
+      partner('aunt', 'auntman'),
+      parent('auntman', 'auntmanmum'),
+      parent('cousin', 'aunt'),
+      parent('cousin', 'auntman'),
+      parent('wife', 'mil'),
+      parent('mil', 'wgran'),
+      parent('wuncle', 'wgran'),
+      parent('wcousin', 'wuncle'),
+      parent('gran', 'ggran'),
+      parent('granbro', 'ggran'),
+      partner('me', 'wife'),
+    )
+    const layout = hourglassLayout(buildIndex(data), 'me')
+    const node = (id: string) => layout.nodes.find((n) => n.personId === id)
+    expect(node('aunt')?.y).toBe(node('dad')?.y as number)
+    expect(node('aunt')?.x as number).toBeLessThan(node('dad')?.x as number)
+    expect(node('auntman')?.y).toBe(node('dad')?.y as number)
+    expect(node('cousin')?.y).toBe(node('me')?.y as number)
+    expect(node('auntmanmum')).toBeUndefined()
+    expect(node('wuncle')?.y).toBe(node('mil')?.y as number)
+    expect(node('wuncle')?.x as number).toBeGreaterThan(node('mil')?.x as number)
+    expect(node('wcousin')?.y).toBe(node('me')?.y as number)
+    expect(node('granbro')?.y).toBe(node('gran')?.y as number)
+    expectNoOverlap(layout)
+  })
+
+  test('shows everyone: all generations and the full families of relatives', () => {
+    const line = ['me', 'p1', 'p2', 'p3', 'p4', 'p5']
+    const data = build(
+      ...line.map((id) => person(id)),
+      person('aunt'),
+      person('cousin'),
+      person('cousinkid'),
+      person('cousingrandkid'),
+      ...line.slice(1).map((id, i) => parent(line[i] as string, id)),
+      parent('aunt', 'p2'),
+      parent('cousin', 'aunt'),
+      parent('cousinkid', 'cousin'),
+      parent('cousingrandkid', 'cousinkid'),
+    )
+    const layout = hourglassLayout(buildIndex(data), 'me')
+    const ids = new Set(layout.nodes.map((n) => n.personId))
+    for (const id of [...line, 'aunt', 'cousin', 'cousinkid', 'cousingrandkid']) {
+      expect(ids.has(id)).toBe(true)
+    }
+    expectNoOverlap(layout)
+  })
+
+  test("shows an ancestor's other partner, and their children come down from that pair", () => {
+    const index = buildIndex(sampleFamily())
+    const layout = hourglassLayout(index, 'daniel')
+    const node = (id: string) => layout.nodes.find((n) => n.personId === id)
+    const thomas = node('thomas') as { x: number; y: number }
+    const helen = node('helen') as { x: number; y: number }
+    expect(helen.y).toBe(thomas.y)
+    expect(Math.abs(helen.x - thomas.x)).toBeLessThan(400)
+    expect(node('walter')).toBeUndefined()
+    const mid = (thomas.x + helen.x) / 2
+    const sarah = node('sarah') as { x: number; y: number }
+    expect(
+      layout.edges.some(
+        (e) =>
+          e.kind === 'child' && e.path.startsWith(`M ${mid} `) && e.path.endsWith(`V ${sarah.y}`),
+      ),
+    ).toBe(true)
+    expectNoOverlap(layout)
+  })
+
   test('a partner shows no hidden children when all their children are shown', () => {
     const data = build(
       person('a'),

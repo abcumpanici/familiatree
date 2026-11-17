@@ -1,5 +1,6 @@
 import { compareDates } from './dates.ts'
 import {
+  centrePartner,
   childGroups,
   type PartnerEntry,
   partnersOf,
@@ -54,8 +55,8 @@ export function hourglassLayout(
   focusId: Id,
   options: LayoutOptions = {},
 ): Layout {
-  const ancestorDepth = options.ancestorDepth ?? 3
-  const descendantDepth = options.descendantDepth ?? 3
+  const ancestorDepth = options.ancestorDepth ?? 20
+  const descendantDepth = options.descendantDepth ?? 20
   const W = options.cardWidth ?? 184
   const H = options.cardHeight ?? 72
   const GAP = options.gap ?? 28
@@ -328,31 +329,31 @@ export function hourglassLayout(
   connectParents(parentNodes, focusNode, -1, focusId)
   focusNode.moreUp = (index.parentsOf.get(focusId)?.length ?? 0) > 0 && parentNodes.size === 0
 
-  const partnerParents = new Map<Id, Map<Id, LayoutNode>>()
-  const unitNodes = nodes.filter((n) => n.generation === 0 && n.role === 'partner')
-  unitNodes.sort((a, b) => Math.abs(a.x - focusNode.x) - Math.abs(b.x - focusNode.x))
-  for (const partnerNode of unitNodes) {
-    const dir = partnerNode.x < focusNode.x ? -1 : 1
+  function placeAvoiding<T>(dir: number, place: (shift: number) => T): T | null {
     let shift = 0
-    for (let attempt = 0; attempt < 40; attempt++) {
+    for (let attempt = 0; attempt < 80; attempt++) {
       const nodeMark = nodes.length
       const edgeMark = edges.length
-      const placed = placeAncestors(partnerNode.personId, partnerNode.x + shift, 0, ancestorDepth)
+      const result = place(shift)
       const fresh = nodes.slice(nodeMark)
-      const old = nodes.slice(0, nodeMark)
-      let needed = 0
+      const rows = new Map<number, number[]>()
+      for (const n of fresh) if (!rows.has(n.y)) rows.set(n.y, [])
+      for (let i = 0; i < nodeMark; i++) {
+        const o = nodes[i] as LayoutNode
+        rows.get(o.y)?.push(o.x)
+      }
+      let clash = false
       for (const n of fresh) {
-        for (const o of old) {
-          if (o.y !== n.y || Math.abs(o.x - n.x) >= W + GAP) continue
-          needed = Math.max(needed, dir > 0 ? o.x + W + GAP - n.x : n.x - (o.x - W - GAP))
+        for (const ox of rows.get(n.y) ?? []) {
+          if (Math.abs(ox - n.x) < W + GAP) clash = true
         }
       }
-      if (needed <= 0) {
-        connectParents(placed, partnerNode, -1, partnerNode.personId)
-        partnerParents.set(partnerNode.personId, placed)
-        partnerNode.moreUp =
-          (index.parentsOf.get(partnerNode.personId)?.length ?? 0) > 0 && placed.size === 0
-        break
+      if (!clash) return result
+      let needed = 0
+      for (const n of fresh) {
+        for (const ox of rows.get(n.y) ?? []) {
+          needed = Math.max(needed, dir > 0 ? ox + W + GAP - n.x : n.x - (ox - W - GAP))
+        }
       }
       for (const n of nodes.splice(nodeMark)) {
         const count = (keyCount.get(n.personId) ?? 1) - 1
@@ -362,6 +363,70 @@ export function hourglassLayout(
       edges.splice(edgeMark)
       shift += dir * needed
     }
+    return null
+  }
+
+  const unitNodes = nodes.filter((n) => n.generation === 0 && n.role === 'partner')
+  unitNodes.sort((a, b) => Math.abs(a.x - focusNode.x) - Math.abs(b.x - focusNode.x))
+  for (const partnerNode of unitNodes) {
+    const dir = partnerNode.x < focusNode.x ? -1 : 1
+    const placed = placeAvoiding(dir, (shift) =>
+      placeAncestors(partnerNode.personId, partnerNode.x + shift, 0, ancestorDepth),
+    )
+    if (!placed) continue
+    connectParents(placed, partnerNode, -1, partnerNode.personId)
+    partnerNode.moreUp =
+      (index.parentsOf.get(partnerNode.personId)?.length ?? 0) > 0 && placed.size === 0
+  }
+
+  for (const ancestor of nodes.filter((n) => n.role === 'ancestor')) {
+    const pair = nodes.find(
+      (n) =>
+        n !== ancestor &&
+        n.role === 'ancestor' &&
+        n.generation === ancestor.generation &&
+        unitPartners(ancestor.personId).some((p) => p.partnerId === n.personId),
+    )
+    for (const entry of unitPartners(ancestor.personId)) {
+      if (keyCount.has(entry.partnerId)) continue
+      const dir = pair ? Math.sign(ancestor.x - pair.x) || 1 : ancestor.x < focusNode.x ? -1 : 1
+      const node = placeAvoiding(dir, (shift) =>
+        addNode(
+          entry.partnerId,
+          ancestor.x + dir * (W + PGAP) + shift,
+          ancestor.generation,
+          'partner',
+          {
+            up: false,
+            down: true,
+          },
+        ),
+      )
+      if (node) partnerEdge(ancestor, node, entry.partnership)
+    }
+  }
+
+  function shownParents(childId: Id, generation: number) {
+    const out: { node: LayoutNode; kind: ParentKind }[] = []
+    for (const link of index.parentsOf.get(childId) ?? []) {
+      const node = nodes.find(
+        (n) =>
+          n.personId === link.parentId &&
+          n.generation === generation &&
+          (n.role === 'ancestor' || n.role === 'partner'),
+      )
+      if (node) out.push({ node, kind: link.kind })
+    }
+    return out.slice(0, 2)
+  }
+
+  function connectSibling(node: LayoutNode, generation: number) {
+    const shown = shownParents(node.personId, generation)
+    const origin = parentOrigin(
+      shown.map((p) => p.node),
+      generation,
+    )
+    if (origin) childEdge(origin, node, generation, shown[0]?.kind ?? 'birth')
   }
 
   const siblings = siblingsOf(index, focusId).filter((s) => !keyCount.has(s.id))
@@ -379,9 +444,9 @@ export function hourglassLayout(
   const younger = partnerLeft && !partnerRight ? byAge : siblings.filter((s) => !older.includes(s))
   let leftCursor = Math.min(-blockWidth / 2, focusNode.x - W / 2)
   let rightCursor = Math.max(blockWidth / 2, focusNode.x + W / 2)
-  const siblingDepth = Math.max(0, descendantDepth - 1)
+  const siblingDepth = descendantDepth
   type Sibling = (typeof siblings)[number]
-  const placeSibling = (s: Sibling, parents: Map<Id, LayoutNode>, side: -1 | 1) => {
+  const placeSibling = (s: Sibling, side: -1 | 1) => {
     if (keyCount.has(s.id)) return
     const width = descWidth(s.id, siblingDepth, new Set())
     const cx = side < 0 ? leftCursor - GAP - width / 2 : rightCursor + GAP + width / 2
@@ -389,27 +454,55 @@ export function hourglassLayout(
     else rightCursor += GAP + width
     const node = placeDescendants(s.id, cx, 0, siblingDepth, 'sibling', new Set())
     node.moreUp = false
-    const shown = s.sharedParentIds
-      .map((id) => parents.get(id))
-      .filter((n): n is LayoutNode => n !== undefined)
-    const origin =
-      shown.length === parents.size ? parentOrigin(shown, -1) : parentOrigin(shown.slice(0, 1), -1)
-    if (origin) {
-      const kind =
-        (index.parentsOf.get(s.id) ?? []).find((l) => s.sharedParentIds.includes(l.parentId))
-          ?.kind ?? 'birth'
-      childEdge(origin, node, -1, kind)
-    }
+    connectSibling(node, -1)
   }
-  for (const s of [...older].reverse()) placeSibling(s, parentNodes, -1)
-  for (const s of younger) placeSibling(s, parentNodes, 1)
+  for (const s of [...older].reverse()) placeSibling(s, -1)
+  for (const s of younger) placeSibling(s, 1)
   for (const partnerNode of unitNodes) {
-    const parents = partnerParents.get(partnerNode.personId) ?? new Map<Id, LayoutNode>()
     const side = partnerNode.x < focusNode.x ? -1 : 1
     const theirs = siblingsOf(index, partnerNode.personId)
       .filter((s) => !keyCount.has(s.id))
       .sort((a, b) => compareDates(born(a.id), born(b.id)))
-    for (const s of side < 0 ? theirs.reverse() : theirs) placeSibling(s, parents, side)
+    for (const s of side < 0 ? theirs.reverse() : theirs) placeSibling(s, side)
+  }
+
+  const centreId = centrePartner(index, focusId)
+  const centreNode = nodes.find(
+    (n) => n.personId === centreId && n.generation === 0 && n.role === 'partner',
+  )
+  const centreX = centreNode ? (focusNode.x + centreNode.x) / 2 : focusNode.x
+  const ancestors = nodes
+    .filter((n) => n.role === 'ancestor')
+    .sort(
+      (a, b) => b.generation - a.generation || Math.abs(a.x - centreX) - Math.abs(b.x - centreX),
+    )
+  for (const ancestor of ancestors) {
+    const parents = new Map<Id, LayoutNode>()
+    for (const link of pedigreeParents(index, ancestor.personId)) {
+      const shown = nodes.find(
+        (n) =>
+          n.personId === link.parentId &&
+          n.role === 'ancestor' &&
+          n.generation === ancestor.generation - 1,
+      )
+      if (shown) parents.set(link.parentId, shown)
+    }
+    if (!parents.size) continue
+    const dir = ancestor.x < centreX ? -1 : 1
+    const depth = descendantDepth - ancestor.generation
+    const theirs = siblingsOf(index, ancestor.personId)
+      .filter((sib) => !keyCount.has(sib.id))
+      .sort((a, b) => compareDates(born(a.id), born(b.id)))
+    for (const sib of dir < 0 ? theirs.reverse() : theirs) {
+      const width = descWidth(sib.id, depth, new Set())
+      const start = ancestor.x + dir * (W / 2 + GAP + width / 2)
+      const node = placeAvoiding(dir, (shift) =>
+        placeDescendants(sib.id, start + shift, ancestor.generation, depth, 'sibling', new Set()),
+      )
+      if (!node) continue
+      node.moreUp = false
+      connectSibling(node, ancestor.generation - 1)
+    }
   }
 
   let minX = Number.POSITIVE_INFINITY
