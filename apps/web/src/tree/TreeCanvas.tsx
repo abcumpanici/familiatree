@@ -225,10 +225,28 @@ export const TreeCanvas = forwardRef<
           if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
             gsap.fromTo(
               el,
-              { x: dx, y: dy, opacity: 1, scale: 1 },
-              { x: 0, y: 0, duration: 0.8, ease: 'power3.inOut' },
+              { x: dx, y: dy },
+              {
+                x: 0,
+                y: 0,
+                opacity: 1,
+                scale: 1,
+                duration: 0.8,
+                ease: 'power3.inOut',
+                overwrite: true,
+              },
             )
-          } else gsap.set(el, { x: 0, y: 0, opacity: 1, scale: 1 })
+          } else {
+            gsap.to(el, {
+              x: 0,
+              y: 0,
+              opacity: 1,
+              scale: 1,
+              duration: 0.25,
+              ease: 'power2.out',
+              overwrite: true,
+            })
+          }
         } else {
           gsap.fromTo(
             el,
@@ -239,6 +257,7 @@ export const TreeCanvas = forwardRef<
               duration: 0.55,
               delay: focusChanged ? 0.4 : 0.1,
               ease: 'back.out(1.7)',
+              overwrite: true,
             },
           )
         }

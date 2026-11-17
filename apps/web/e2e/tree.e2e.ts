@@ -16,6 +16,13 @@ async function newTree(page: Page, options: { name?: string; example?: boolean }
 
 const person = (page: Page, name: string) => page.locator('[data-person]').filter({ hasText: name })
 
+async function expectShown(page: Page, name: string) {
+  const card = person(page, name).locator('xpath=ancestor::*[@data-card][1]')
+  await expect
+    .poll(() => card.evaluate((el) => Number(getComputedStyle(el).opacity)), { timeout: 4000 })
+    .toBe(1)
+}
+
 async function addFirstPerson(page: Page, firstNames: string, surname: string) {
   await page.getByRole('button', { name: 'Add the first person' }).click()
   const dialog = page.getByRole('dialog')
@@ -23,7 +30,7 @@ async function addFirstPerson(page: Page, firstNames: string, surname: string) {
   await dialog.getByLabel('Surname', { exact: true }).fill(surname)
   await dialog.getByLabel('Born').fill('about 1931')
   await dialog.getByRole('button', { name: 'Add to the tree' }).click()
-  await expect(page.locator('[data-person]').filter({ hasText: firstNames })).toBeVisible()
+  await expectShown(page, firstNames)
 }
 
 async function addRelative(page: Page, kind: 'Parent' | 'Partner' | 'Child', firstNames: string) {
@@ -32,7 +39,7 @@ async function addRelative(page: Page, kind: 'Parent' | 'Partner' | 'Child', fir
   const dialog = page.getByRole('dialog')
   await dialog.getByLabel('First names').fill(firstNames)
   await dialog.getByRole('button', { name: 'Add', exact: true }).click()
-  await expect(page.locator('[data-person]').filter({ hasText: firstNames })).toBeVisible()
+  await expectShown(page, firstNames)
 }
 
 test('a tree keeps people after a reload', async ({ page }) => {
@@ -40,10 +47,24 @@ test('a tree keeps people after a reload', async ({ page }) => {
   await addFirstPerson(page, 'Maria', 'Popa')
   await expect(page.locator('[data-person]').first()).toContainText('c. 1931')
   await addRelative(page, 'Partner', 'Ion')
+  await addRelative(page, 'Parent', 'Ana')
   await addRelative(page, 'Child', 'Elena')
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() =>
+          Math.min(
+            ...[...document.querySelectorAll('[data-edge]')].map((el) =>
+              Number(getComputedStyle(el).opacity),
+            ),
+          ),
+        ),
+      { timeout: 4000 },
+    )
+    .toBe(1)
   await expect(page.getByRole('status').filter({ hasText: 'Saving' })).toHaveCount(0)
   await page.reload()
-  for (const name of ['Maria', 'Ion', 'Elena']) {
+  for (const name of ['Maria', 'Ion', 'Ana', 'Elena']) {
     await expect(page.locator('[data-person]').filter({ hasText: name })).toBeVisible()
   }
 })
