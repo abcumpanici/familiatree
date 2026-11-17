@@ -1,4 +1,6 @@
 import {
+  centrePartner,
+  coupleRelationLabel,
   hourglassLayout,
   type Layout,
   type LayoutEdge,
@@ -18,7 +20,7 @@ import {
   useRef,
 } from 'react'
 import { prefersReducedMotion } from '../lib/prefs.ts'
-import { type AddKind, CARD_H, CARD_W, PersonCard } from './PersonCard.tsx'
+import { CARD_H, CARD_W, PersonCard } from './PersonCard.tsx'
 
 gsap.registerPlugin(DrawSVGPlugin)
 gsap.config({ nullTargetWarn: false })
@@ -51,10 +53,9 @@ export const TreeCanvas = forwardRef<
     selectedId: string | null
     homeId: string | null
     onOpen: (personId: string) => void
-    onAdd: (kind: AddKind, personId: string) => void
     insetRight: number
   }
->(function TreeCanvas({ index, focusId, selectedId, homeId, onOpen, onAdd, insetRight }, ref) {
+>(function TreeCanvas({ index, focusId, selectedId, homeId, onOpen, insetRight }, ref) {
   const viewport = useRef<HTMLDivElement>(null)
   const world = useRef<HTMLDivElement>(null)
   const cam = useRef<Camera>({ x: 0, y: 0, s: 1 })
@@ -69,9 +70,18 @@ export const TreeCanvas = forwardRef<
     () => hourglassLayout(index, focusId, { cardWidth: CARD_W, cardHeight: CARD_H, rowGap: 76 }),
     [index, focusId],
   )
+  const partnerId = useMemo(() => centrePartner(index, focusId), [index, focusId])
   const relations = useMemo(
-    () => new Map(layout.nodes.map((n) => [n.personId, relationLabel(index, focusId, n.personId)])),
-    [index, focusId, layout],
+    () =>
+      new Map(
+        layout.nodes.map((n) => [
+          n.personId,
+          partnerId
+            ? coupleRelationLabel(index, focusId, partnerId, n.personId)
+            : relationLabel(index, focusId, n.personId),
+        ]),
+      ),
+    [index, focusId, partnerId, layout],
   )
 
   const applyCam = useCallback(() => {
@@ -84,14 +94,18 @@ export const TreeCanvas = forwardRef<
       const vp = viewport.current
       const node = layout.nodes.find((n) => n.role === 'focus')
       if (!vp || !node) return { x: 0, y: 0, s: scale }
+      const partner = layout.nodes.find(
+        (n) => n.personId === partnerId && n.generation === 0 && n.role === 'partner',
+      )
+      const centreX = partner ? (node.x + partner.x) / 2 : node.x
       const narrow = vp.clientWidth < 640
       return {
         s: scale,
-        x: (vp.clientWidth - insetRight) / 2 - node.x * scale,
+        x: (vp.clientWidth - insetRight) / 2 - centreX * scale,
         y: vp.clientHeight * (narrow ? 0.4 : 0.45) - (node.y + CARD_H / 2) * scale,
       }
     },
-    [layout, insetRight],
+    [layout, insetRight, partnerId],
   )
 
   const animateCam = useCallback(
@@ -449,9 +463,6 @@ export const TreeCanvas = forwardRef<
         {layout.nodes.map((node) => {
           const person = index.people.get(node.personId)
           if (!person) return null
-          const birthParents = (index.parentsOf.get(person.id) ?? []).filter(
-            (l) => l.kind === 'birth',
-          ).length
           return (
             <PersonCard
               key={node.key}
@@ -461,9 +472,10 @@ export const TreeCanvas = forwardRef<
               selected={selectedId === person.id}
               home={homeId === person.id}
               relation={relations.get(person.id) ?? null}
-              canAddParent={birthParents < 2}
+              paired={
+                node.personId === partnerId && node.generation === 0 && node.role === 'partner'
+              }
               onOpen={onOpen}
-              onAdd={onAdd}
             />
           )
         })}

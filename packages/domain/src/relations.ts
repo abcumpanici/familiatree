@@ -130,3 +130,8 @@ export function siblingsOf(index: TreeIndex, id: Id): SiblingEntry[] {
 export function displayName(person: Pick<Person, 'firstNames' | 'surname'>): string {
   return [person.firstNames, person.surname].filter(Boolean).join(' ')
 }
+
+export function centrePartner(index: TreeIndex, id: Id): Id | null {
+  const current = partnersOf(index, id).find((p) => p.partnership && !p.partnership.ended)
+  return current?.partnerId ?? null
+}

@@ -174,3 +174,32 @@ export function relationLabel(index: TreeIndex, fromId: Id, toId: Id): string | 
   }
   return null
 }
+
+function lineage(index: TreeIndex, id: Id): Set<Id> {
+  return new Set([id, ...walk(index, id, true).keys()])
+}
+
+function sharesBlood(index: TreeIndex, a: Set<Id>, id: Id): boolean {
+  for (const x of lineage(index, id)) if (a.has(x)) return true
+  return false
+}
+
+export function coupleRelationLabel(index: TreeIndex, aId: Id, bId: Id, toId: Id): string | null {
+  if (toId === aId || toId === bId) return null
+  const name = (id: Id) => index.people.get(id)?.firstNames.trim().split(/\s+/)[0] || 'Partner'
+  const aLine = lineage(index, aId)
+  const bLine = lineage(index, bId)
+  const toA = sharesBlood(index, aLine, toId)
+  const toB = sharesBlood(index, bLine, toId)
+  const side = (id: Id) => {
+    const label = relationLabel(index, id, toId)
+    return label ? `${name(id)}'s ${lower(label)}` : null
+  }
+  if (toA && toB) return relationLabel(index, aId, toId) ?? relationLabel(index, bId, toId)
+  if (toA) return side(aId)
+  if (toB) return side(bId)
+  const partners = partnersOf(index, toId).map((p) => p.partnerId)
+  if (partners.some((p) => p === aId || sharesBlood(index, aLine, p))) return side(aId)
+  if (partners.some((p) => p === bId || sharesBlood(index, bLine, p))) return side(bId)
+  return null
+}

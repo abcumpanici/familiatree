@@ -101,7 +101,6 @@ function TreeView({ session, search }: { session: TreeSession; search: URLSearch
           selectedId={selectedId}
           homeId={tree.homePersonId}
           onOpen={open}
-          onAdd={onAdd}
           insetRight={selectedId && wide ? 444 : 0}
         />
       ) : (

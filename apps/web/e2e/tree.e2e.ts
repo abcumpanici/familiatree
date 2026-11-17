@@ -34,8 +34,9 @@ async function addFirstPerson(page: Page, firstNames: string, surname: string) {
 }
 
 async function addRelative(page: Page, kind: 'Parent' | 'Partner' | 'Child', firstNames: string) {
-  await page.locator('[data-add]').click()
-  await page.getByRole('menuitem', { name: kind }).click()
+  const panel = page.getByRole('complementary')
+  if (!(await panel.isVisible())) await page.locator('[data-person][aria-current="true"]').click()
+  await panel.getByRole('button', { name: `Add a ${kind.toLowerCase()}` }).click()
   const dialog = page.getByRole('dialog')
   await dialog.getByLabel('First names').fill(firstNames)
   await dialog.getByRole('button', { name: 'Add', exact: true }).click()
@@ -78,6 +79,15 @@ test('a story shows in the panel', async ({ page }) => {
   await panel.getByLabel('Story').fill('Taught **piano** for 40 years.')
   await panel.getByRole('button', { name: 'Save changes' }).click()
   await expect(panel.locator('strong', { hasText: 'piano' })).toBeVisible()
+})
+
+test('the couple is the centre of the tree', async ({ page }) => {
+  await newTree(page, { example: true })
+  await expect(person(page, 'Daniel')).toHaveAttribute('aria-current', 'true')
+  await expect(page.locator('[data-add]')).toHaveCount(0)
+  await expect(person(page, 'Lena').locator('xpath=..')).not.toContainText('Wife')
+  await expect(person(page, 'Thomas').locator('xpath=..')).toContainText("Daniel's father")
+  await expect(person(page, 'Margaret').locator('xpath=..')).toContainText("Daniel's mother")
 })
 
 test('a tap opens a person and Show in tree moves the tree', async ({ page }) => {

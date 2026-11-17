@@ -1,5 +1,5 @@
 import type { LayoutNode, Person } from '@familytree/domain'
-import { memo, useEffect, useRef, useState } from 'react'
+import { memo } from 'react'
 import { ageLabel, birthLine, lifespan } from '../lib/people.ts'
 import { Icon } from '../ui/Icon.tsx'
 import { Portrait } from './Portrait.tsx'
@@ -16,9 +16,8 @@ export const PersonCard = memo(function PersonCard({
   selected,
   home,
   relation,
-  canAddParent,
+  paired,
   onOpen,
-  onAdd,
 }: {
   node: LayoutNode
   person: Person
@@ -26,9 +25,8 @@ export const PersonCard = memo(function PersonCard({
   selected: boolean
   home: boolean
   relation: string | null
-  canAddParent: boolean
+  paired: boolean
   onOpen: (personId: string) => void
-  onAdd: (kind: AddKind, personId: string) => void
 }) {
   const years = lifespan(person)
   const line = birthLine(person)
@@ -58,7 +56,7 @@ export const PersonCard = memo(function PersonCard({
         className={`group flex h-full w-full items-center gap-3 rounded-[22px] bg-surface pr-3 pl-2.5 text-left transition-[box-shadow,transform] duration-300 ease-out-soft ${
           selected
             ? '-translate-y-1 shadow-float ring-2 ring-accent ring-offset-4 ring-offset-accent-soft'
-            : focused
+            : focused || paired
               ? 'shadow-float ring-2 ring-accent hover:-translate-y-0.5'
               : 'shadow-lift ring-1 ring-line/70 hover:-translate-y-0.5 hover:ring-line'
         }`}
@@ -90,7 +88,7 @@ export const PersonCard = memo(function PersonCard({
         )}
       </button>
       {relation && (
-        <span className="pointer-events-none absolute -top-2.5 left-[70px] max-w-[130px] truncate rounded-full bg-accent-soft px-2 py-0.5 text-[11px] leading-tight font-medium text-accent ring-[3px] ring-paper">
+        <span className="pointer-events-none absolute -top-2.5 left-1/2 max-w-[196px] -translate-x-1/2 truncate whitespace-nowrap rounded-full bg-accent-soft px-2 py-0.5 text-[11px] leading-tight font-medium text-accent ring-[3px] ring-paper">
           {relation}
         </span>
       )}
@@ -110,75 +108,6 @@ export const PersonCard = memo(function PersonCard({
           <span className="h-1 w-1 rounded-full bg-faint" />
         </span>
       )}
-      {focused && <AddMenu canAddParent={canAddParent} onPick={(kind) => onAdd(kind, person.id)} />}
     </div>
   )
 })
-
-function AddMenu({
-  canAddParent,
-  onPick,
-}: {
-  canAddParent: boolean
-  onPick: (kind: AddKind) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const root = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (!open) return
-    const onDown = (e: PointerEvent) => {
-      if (!root.current?.contains(e.target as Node)) setOpen(false)
-    }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('pointerdown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('pointerdown', onDown)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [open])
-  const items: { kind: AddKind; label: string }[] = [
-    ...(canAddParent ? [{ kind: 'parent' as const, label: 'Parent' }] : []),
-    { kind: 'partner', label: 'Partner' },
-    { kind: 'child', label: 'Child' },
-  ]
-  return (
-    <div ref={root} className="absolute -top-3 -right-3 z-10">
-      <button
-        type="button"
-        data-add
-        aria-label="Add a relative"
-        aria-expanded={open}
-        title="Add a relative"
-        onClick={() => setOpen((o) => !o)}
-        className={`flex h-8 w-8 items-center justify-center rounded-full bg-accent text-accent-ink shadow-lift ring-[3px] ring-paper transition-transform duration-300 ease-out-soft hover:scale-110 ${open ? 'rotate-45' : ''}`}
-      >
-        <Icon name="plus" size={16} />
-      </button>
-      {open && (
-        <div
-          role="menu"
-          className="absolute top-10 left-1/2 flex -translate-x-1/2 flex-col gap-1 rounded-2xl bg-surface p-1.5 shadow-float ring-1 ring-line animate-[rise_220ms_cubic-bezier(0.22,1,0.36,1)]"
-        >
-          {items.map((item) => (
-            <button
-              type="button"
-              role="menuitem"
-              key={item.kind}
-              onClick={() => {
-                setOpen(false)
-                onPick(item.kind)
-              }}
-              className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-sm whitespace-nowrap hover:bg-sunken"
-            >
-              <Icon name="plus" size={14} className="text-accent" />
-              {item.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
