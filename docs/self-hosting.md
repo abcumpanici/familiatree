@@ -148,12 +148,13 @@ A JSON file has all the data, with photos. To get the tree back, import the JSON
 
 Set these environment variables in `docker-compose.yml`, or before `bun run start`.
 
-| Variable              | Default | What it does                                                                                 |
-| --------------------- | ------- | -------------------------------------------------------------------------------------------- |
-| `PORT`                | `3000`  | The HTTP port                                                                                |
-| `DATA_DIR`            | `/data` | The folder for the SQLite file (`./data` when you use `bun run start`)                       |
-| `MAX_PEOPLE_PER_TREE` | `2000`  | The maximum number of people in one tree                                                     |
-| `MAX_TREES`           | `100`   | The maximum number of trees on the server                                                    |
-| `TRUST_PROXY`         | `false` | Set to `true` behind a reverse proxy. Links in the API docs then use `X-Forwarded-*` headers |
+| Variable              | Default | What it does                                                                                                              |
+| --------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `PORT`                | `3000`  | The HTTP port                                                                                                             |
+| `DATA_DIR`            | `/data` | The folder for the SQLite file (`./data` when you use `bun run start`)                                                    |
+| `MAX_PEOPLE_PER_TREE` | `2000`  | The maximum number of people in one tree                                                                                  |
+| `MAX_TREES`           | `100`   | The maximum number of trees on the server                                                                                 |
+| `TRUST_PROXY`         | `false` | Set to `true` behind a reverse proxy. Links in the API docs then use `X-Forwarded-*` headers                              |
+| `FRAME_ANCESTORS`     | empty   | Sites that can show the app in a frame, separated by spaces. Example: `http://ha.home` for a Home Assistant sidebar panel |
 
 If an older version kept trees in your browser, open the app one time in that browser. The app moves those trees to the server.

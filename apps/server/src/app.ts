@@ -22,10 +22,11 @@ export function createApp({ db, config }: { db: Db; config: Config }) {
         connectSrc: ["'self'"],
         fontSrc: ["'self'", 'data:'],
         objectSrc: ["'none'"],
-        frameAncestors: ["'none'"],
+        frameAncestors: config.frameAncestors.length ? config.frameAncestors : ["'none'"],
         baseUri: ["'self'"],
       },
       crossOriginEmbedderPolicy: false,
+      xFrameOptions: config.frameAncestors.length ? false : 'SAMEORIGIN',
     }),
   )
   app.use('/api/docs', async (c, next) => {

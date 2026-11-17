@@ -7,6 +7,7 @@ export interface Config {
   maxPeoplePerTree: number
   maxTrees: number
   trustProxy: boolean
+  frameAncestors: string[]
   webDist: string | null
 }
 
@@ -29,6 +30,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     maxPeoplePerTree: int(env.MAX_PEOPLE_PER_TREE, 2000),
     maxTrees: int(env.MAX_TREES, 100),
     trustProxy: bool(env.TRUST_PROXY, false),
+    frameAncestors: (env.FRAME_ANCESTORS ?? '').split(/\s+/).filter(Boolean),
     webDist: existsSync(join(webDist, 'index.html')) ? webDist : null,
   }
 }
@@ -40,6 +42,7 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     maxPeoplePerTree: 2000,
     maxTrees: 100,
     trustProxy: false,
+    frameAncestors: [],
     webDist: null,
     ...overrides,
   }
