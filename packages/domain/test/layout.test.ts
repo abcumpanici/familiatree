@@ -117,6 +117,47 @@ describe('hourglassLayout', () => {
     expectNoOverlap(layout)
   })
 
+  test('shows siblings of the focus and of the partner with their own families', () => {
+    const data = build(
+      person('me', '1996'),
+      person('wife', '1996'),
+      person('dad'),
+      person('mil'),
+      person('sis', '2000'),
+      person('sisman'),
+      person('sismanmum'),
+      person('niece'),
+      person('wsis', '1990'),
+      person('wsisman'),
+      person('wsismanmum'),
+      person('nephew'),
+      parent('me', 'dad'),
+      parent('sis', 'dad'),
+      parent('wife', 'mil'),
+      parent('wsis', 'mil'),
+      partner('me', 'wife'),
+      partner('sis', 'sisman'),
+      parent('niece', 'sis'),
+      parent('niece', 'sisman'),
+      parent('sisman', 'sismanmum'),
+      partner('wsis', 'wsisman'),
+      parent('nephew', 'wsis'),
+      parent('nephew', 'wsisman'),
+      parent('wsisman', 'wsismanmum'),
+    )
+    const layout = hourglassLayout(buildIndex(data), 'me')
+    const node = (id: string) => layout.nodes.find((n) => n.personId === id)
+    for (const id of ['sis', 'wsis']) expect(node(id)?.role).toBe('sibling')
+    for (const id of ['sisman', 'wsisman']) expect(node(id)?.role).toBe('partner')
+    for (const id of ['niece', 'nephew']) expect(node(id)?.role).toBe('descendant')
+    expect(node('niece')?.y as number).toBeGreaterThan(node('sis')?.y as number)
+    expect(node('sis')?.x as number).toBeLessThan(node('me')?.x as number)
+    expect(node('wsis')?.x as number).toBeGreaterThan(node('wife')?.x as number)
+    expect(node('sismanmum')).toBeUndefined()
+    expect(node('wsismanmum')).toBeUndefined()
+    expectNoOverlap(layout)
+  })
+
   test('a partner shows no hidden children when all their children are shown', () => {
     const data = build(
       person('a'),

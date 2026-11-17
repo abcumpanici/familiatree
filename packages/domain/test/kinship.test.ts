@@ -65,6 +65,41 @@ describe('relationLabel', () => {
     expect(relationLabel(i, 'me', 'nana')).toBe('Grandmother-in-law')
   })
 
+  test("names a partner's sibling's family", () => {
+    const people: [string, Gender][] = [
+      ['me', 'male'],
+      ['wife', 'female'],
+      ['mil', 'female'],
+      ['wsis', 'female'],
+      ['wsisman', 'male'],
+      ['niece', 'female'],
+      ['grand', 'male'],
+    ]
+    const commands: Command[] = [
+      ...people.map(
+        ([id, gender]): Command => ({ type: 'addPerson', person: { id, firstNames: id, gender } }),
+      ),
+      { type: 'addParentLink', link: { childId: 'wife', parentId: 'mil' } },
+      { type: 'addParentLink', link: { childId: 'wsis', parentId: 'mil' } },
+      { type: 'addParentLink', link: { childId: 'niece', parentId: 'wsis' } },
+      { type: 'addParentLink', link: { childId: 'grand', parentId: 'niece' } },
+      {
+        type: 'addPartnership',
+        partnership: { personAId: 'me', personBId: 'wife', married: true },
+      },
+      {
+        type: 'addPartnership',
+        partnership: { personAId: 'wsis', personBId: 'wsisman', married: true },
+      },
+    ]
+    const data = commands.reduce((d, c) => applyCommand(d, c).data, emptyTree({ name: 'T' }))
+    const i = buildIndex(data)
+    expect(relationLabel(i, 'me', 'wsis')).toBe('Sister-in-law')
+    expect(relationLabel(i, 'me', 'wsisman')).toBe('Brother-in-law')
+    expect(relationLabel(i, 'me', 'niece')).toBe('Niece')
+    expect(relationLabel(i, 'me', 'grand')).toBe('Great-nephew')
+  })
+
   test('uses neutral words when the gender is not known', () => {
     const people: [string, Gender][] = [
       ['me', 'unknown'],

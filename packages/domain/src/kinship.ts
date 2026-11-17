@@ -134,6 +134,16 @@ export function relationLabel(index: TreeIndex, fromId: Id, toId: Id): string | 
     if (ancestorOfPartner) return `${lineal(W.parent, ancestorOfPartner, g, true)}-in-law`
     if (siblingsOf(index, p.partnerId).some((s) => s.id === toId)) return pick(W.siblingInLaw, g)
   }
+  for (const p of partners) {
+    if (p.partnership?.ended) continue
+    for (const s of siblingsOf(index, p.partnerId)) {
+      if (partnersOf(index, s.id).some((q) => q.partnerId === toId && !q.partnership?.ended)) {
+        return pick(W.siblingInLaw, g)
+      }
+      const d = walk(index, s.id, false).get(toId)?.gen
+      if (d) return `${greats(d - 1)}${d > 1 ? lower(pick(W.nephew, g)) : pick(W.nephew, g)}`
+    }
+  }
   for (const s of siblings) {
     if (partnersOf(index, s.id).some((p) => p.partnerId === toId && !p.partnership?.ended)) {
       return pick(W.siblingInLaw, g)

@@ -328,6 +328,7 @@ export function hourglassLayout(
   connectParents(parentNodes, focusNode, -1, focusId)
   focusNode.moreUp = (index.parentsOf.get(focusId)?.length ?? 0) > 0 && parentNodes.size === 0
 
+  const partnerParents = new Map<Id, Map<Id, LayoutNode>>()
   const unitNodes = nodes.filter((n) => n.generation === 0 && n.role === 'partner')
   unitNodes.sort((a, b) => Math.abs(a.x - focusNode.x) - Math.abs(b.x - focusNode.x))
   for (const partnerNode of unitNodes) {
@@ -348,6 +349,7 @@ export function hourglassLayout(
       }
       if (needed <= 0) {
         connectParents(placed, partnerNode, -1, partnerNode.personId)
+        partnerParents.set(partnerNode.personId, placed)
         partnerNode.moreUp =
           (index.parentsOf.get(partnerNode.personId)?.length ?? 0) > 0 && placed.size === 0
         break
@@ -375,18 +377,23 @@ export function hourglassLayout(
         ? []
         : siblings.filter((s) => compareDates(born(s.id), focusBorn) < 0 && focusBorn !== '')
   const younger = partnerLeft && !partnerRight ? byAge : siblings.filter((s) => !older.includes(s))
-  const leftEdge = Math.min(-blockWidth / 2, focusNode.x - W / 2)
-  const rightEdge = Math.max(blockWidth / 2, focusNode.x + W / 2)
-  const placeSibling = (s: (typeof siblings)[number], x: number) => {
-    const node = addNode(s.id, x, 0, 'sibling', { up: false, down: false })
+  let leftCursor = Math.min(-blockWidth / 2, focusNode.x - W / 2)
+  let rightCursor = Math.max(blockWidth / 2, focusNode.x + W / 2)
+  const siblingDepth = Math.max(0, descendantDepth - 1)
+  type Sibling = (typeof siblings)[number]
+  const placeSibling = (s: Sibling, parents: Map<Id, LayoutNode>, side: -1 | 1) => {
+    if (keyCount.has(s.id)) return
+    const width = descWidth(s.id, siblingDepth, new Set())
+    const cx = side < 0 ? leftCursor - GAP - width / 2 : rightCursor + GAP + width / 2
+    if (side < 0) leftCursor -= GAP + width
+    else rightCursor += GAP + width
+    const node = placeDescendants(s.id, cx, 0, siblingDepth, 'sibling', new Set())
     node.moreUp = false
     const shown = s.sharedParentIds
-      .map((id) => parentNodes.get(id))
+      .map((id) => parents.get(id))
       .filter((n): n is LayoutNode => n !== undefined)
     const origin =
-      shown.length === parentNodes.size
-        ? parentOrigin(shown, -1)
-        : parentOrigin(shown.slice(0, 1), -1)
+      shown.length === parents.size ? parentOrigin(shown, -1) : parentOrigin(shown.slice(0, 1), -1)
     if (origin) {
       const kind =
         (index.parentsOf.get(s.id) ?? []).find((l) => s.sharedParentIds.includes(l.parentId))
@@ -394,12 +401,16 @@ export function hourglassLayout(
       childEdge(origin, node, -1, kind)
     }
   }
-  older.reverse().forEach((s, i) => {
-    placeSibling(s, leftEdge - GAP - W / 2 - i * (W + GAP))
-  })
-  younger.forEach((s, i) => {
-    placeSibling(s, rightEdge + GAP + W / 2 + i * (W + GAP))
-  })
+  for (const s of [...older].reverse()) placeSibling(s, parentNodes, -1)
+  for (const s of younger) placeSibling(s, parentNodes, 1)
+  for (const partnerNode of unitNodes) {
+    const parents = partnerParents.get(partnerNode.personId) ?? new Map<Id, LayoutNode>()
+    const side = partnerNode.x < focusNode.x ? -1 : 1
+    const theirs = siblingsOf(index, partnerNode.personId)
+      .filter((s) => !keyCount.has(s.id))
+      .sort((a, b) => compareDates(born(a.id), born(b.id)))
+    for (const s of side < 0 ? theirs.reverse() : theirs) placeSibling(s, parents, side)
+  }
 
   let minX = Number.POSITIVE_INFINITY
   let minY = Number.POSITIVE_INFINITY
