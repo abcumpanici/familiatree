@@ -328,11 +328,53 @@ export function hourglassLayout(
   connectParents(parentNodes, focusNode, -1, focusId)
   focusNode.moreUp = (index.parentsOf.get(focusId)?.length ?? 0) > 0 && parentNodes.size === 0
 
+  const unitNodes = nodes.filter((n) => n.generation === 0 && n.role === 'partner')
+  unitNodes.sort((a, b) => Math.abs(a.x - focusNode.x) - Math.abs(b.x - focusNode.x))
+  for (const partnerNode of unitNodes) {
+    const dir = partnerNode.x < focusNode.x ? -1 : 1
+    let shift = 0
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const nodeMark = nodes.length
+      const edgeMark = edges.length
+      const placed = placeAncestors(partnerNode.personId, partnerNode.x + shift, 0, ancestorDepth)
+      const fresh = nodes.slice(nodeMark)
+      const old = nodes.slice(0, nodeMark)
+      let needed = 0
+      for (const n of fresh) {
+        for (const o of old) {
+          if (o.y !== n.y || Math.abs(o.x - n.x) >= W + GAP) continue
+          needed = Math.max(needed, dir > 0 ? o.x + W + GAP - n.x : n.x - (o.x - W - GAP))
+        }
+      }
+      if (needed <= 0) {
+        connectParents(placed, partnerNode, -1, partnerNode.personId)
+        partnerNode.moreUp =
+          (index.parentsOf.get(partnerNode.personId)?.length ?? 0) > 0 && placed.size === 0
+        break
+      }
+      for (const n of nodes.splice(nodeMark)) {
+        const count = (keyCount.get(n.personId) ?? 1) - 1
+        if (count > 0) keyCount.set(n.personId, count)
+        else keyCount.delete(n.personId)
+      }
+      edges.splice(edgeMark)
+      shift += dir * needed
+    }
+  }
+
   const siblings = siblingsOf(index, focusId).filter((s) => !keyCount.has(s.id))
-  const older = siblings.filter(
-    (s) => compareDates(index.people.get(s.id)?.bornDate ?? '', focusBorn) < 0 && focusBorn !== '',
-  )
-  const younger = siblings.filter((s) => !older.includes(s))
+  const order = unitOrder(focusId)
+  const partnerLeft = order.indexOf(focusId) > 0
+  const partnerRight = order.indexOf(focusId) < order.length - 1
+  const born = (id: Id) => index.people.get(id)?.bornDate ?? ''
+  const byAge = [...siblings].sort((a, b) => compareDates(born(a.id), born(b.id)))
+  const older =
+    partnerRight && !partnerLeft
+      ? byAge
+      : partnerLeft && !partnerRight
+        ? []
+        : siblings.filter((s) => compareDates(born(s.id), focusBorn) < 0 && focusBorn !== '')
+  const younger = partnerLeft && !partnerRight ? byAge : siblings.filter((s) => !older.includes(s))
   const leftEdge = Math.min(-blockWidth / 2, focusNode.x - W / 2)
   const rightEdge = Math.max(blockWidth / 2, focusNode.x + W / 2)
   const placeSibling = (s: (typeof siblings)[number], x: number) => {

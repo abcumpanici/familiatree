@@ -97,6 +97,26 @@ describe('hourglassLayout', () => {
     expect(node('small')?.x as number).toBeGreaterThan(node('me')?.x as number)
   })
 
+  test('puts all siblings on the side away from the partner', () => {
+    const data = build(
+      person('me', '1996'),
+      person('wife', '1996'),
+      person('big', '1990'),
+      person('small', '2008'),
+      person('dad'),
+      parent('me', 'dad'),
+      parent('big', 'dad'),
+      parent('small', 'dad'),
+      partner('me', 'wife'),
+    )
+    const layout = hourglassLayout(buildIndex(data), 'me')
+    const x = (id: string) => layout.nodes.find((n) => n.personId === id)?.x as number
+    expect(x('wife')).toBeGreaterThan(x('me'))
+    expect(x('small')).toBeLessThan(x('me'))
+    expect(x('big')).toBeLessThan(x('small'))
+    expectNoOverlap(layout)
+  })
+
   test('a partner shows no hidden children when all their children are shown', () => {
     const data = build(
       person('a'),
@@ -114,6 +134,48 @@ describe('hourglassLayout', () => {
     const withBoth = applyCommand(data, parent('d', 'a')).data
     const again = hourglassLayout(buildIndex(withBoth), 'a')
     expect(again.nodes.find((n) => n.personId === 'b')?.moreDown).toBe(false)
+  })
+
+  test('shows the ancestors of each partner of the focus, without overlap', () => {
+    const data = build(
+      person('me'),
+      person('dad'),
+      person('mum'),
+      person('wife'),
+      person('ex'),
+      person('inlaw'),
+      person('inlaw2'),
+      person('inlawdad'),
+      person('exmum'),
+      parent('me', 'dad'),
+      parent('me', 'mum'),
+      parent('wife', 'inlaw'),
+      parent('wife', 'inlaw2'),
+      parent('inlaw', 'inlawdad'),
+      parent('ex', 'exmum'),
+      partner('me', 'wife'),
+      partner('me', 'ex', '2000'),
+    )
+    const layout = hourglassLayout(buildIndex(data), 'me')
+    const node = (id: string) => layout.nodes.find((n) => n.personId === id)
+    for (const id of ['inlaw', 'inlaw2', 'inlawdad', 'exmum']) {
+      expect(node(id)?.role).toBe('ancestor')
+    }
+    expect(node('inlaw')?.y).toBe(node('dad')?.y as number)
+    expect(node('inlawdad')?.y as number).toBeLessThan(node('inlaw')?.y as number)
+    expect(node('inlaw')?.x as number).toBeGreaterThan(node('mum')?.x as number)
+    expect(node('exmum')?.x as number).toBeLessThan(node('dad')?.x as number)
+    expect(node('wife')?.moreUp).toBe(false)
+    expect(node('ex')?.moreUp).toBe(false)
+    const wife = node('wife') as { x: number; y: number }
+    const toWife = layout.edges.filter(
+      (e) =>
+        e.kind === 'child' &&
+        e.path.endsWith(`V ${wife.y}`) &&
+        (e.path.includes(`Q ${wife.x} `) || e.path.startsWith(`M ${wife.x} `)),
+    )
+    expect(toWife).toHaveLength(1)
+    expectNoOverlap(layout)
   })
 
   test('marks hidden relatives beyond the depth', () => {
