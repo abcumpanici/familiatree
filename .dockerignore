@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+data
+.git
+**/test-results
+**/playwright-report
+**/*.sqlite*
+.DS_Store
+Dockerfile
+docker-compose.yml
+build

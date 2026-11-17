@@ -1,0 +1,16 @@
+services:
+  familytree:
+    build: .
+    image: familytree:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - familytree-data:/data
+    environment:
+      MAX_PEOPLE_PER_TREE: "2000"
+      MAX_TREES: "100"
+      TRUST_PROXY: "false"
+    restart: unless-stopped
+
+volumes:
+  familytree-data:

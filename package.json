@@ -1,0 +1,26 @@
+{
+  "name": "familytree",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun run --filter '@familytree/server' dev & bun run --filter '@familytree/web' dev",
+    "build": "bun run --filter '@familytree/web' build",
+    "start": "bun run --filter '@familytree/server' start",
+    "test": "bun test ./apps ./packages",
+    "typecheck": "tsc -b",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "check": "biome check . && tsc -b && bun test ./apps ./packages",
+    "e2e": "bun run --filter '@familytree/web' e2e",
+    "ha-addon": "sh scripts/ha-addon.sh"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.8",
+    "@types/bun": "1.4.4",
+    "typescript": "7.0.2"
+  }
+}
