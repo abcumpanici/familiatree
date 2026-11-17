@@ -124,7 +124,7 @@ test('a tree is stored on the server @dev', async ({ page }) => {
   await expect(page.getByRole('status').filter({ hasText: 'Saving' })).toHaveCount(0)
   await expect
     .poll(async () => {
-      const trees = (await (await page.request.get('/api/trees')).json()) as {
+      const trees = (await page.evaluate(() => fetch('/api/trees').then((r) => r.json()))) as {
         name: string
         peopleCount: number
       }[]
@@ -200,7 +200,10 @@ test('Start my tree on the welcome page makes a tree on the server', async ({ pa
   await page.getByRole('button', { name: 'Start my tree' }).click()
   await expect(page.getByRole('button', { name: 'Add the first person' })).toBeVisible()
   const id = new URL(page.url()).pathname.split('/').pop()
-  expect((await page.request.get(`/api/trees/${id}`)).status()).toBe(200)
+  await page.unrouteAll()
+  expect(await page.evaluate((path) => fetch(path).then((r) => r.status), `/api/trees/${id}`)).toBe(
+    200,
+  )
 })
 
 test('a clear error shows when the server cannot be reached', async ({ page }) => {

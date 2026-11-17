@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { applyCommand, DomainError, emptyTree } from '../src/ops.ts'
+import { applyCommand, DomainError, emptyTree, newId } from '../src/ops.ts'
 import type { Command, TreeData } from '../src/types.ts'
 
 const NOW = '2026-01-01T00:00:00.000Z'
@@ -237,4 +237,18 @@ describe('tree', () => {
     applyCommand(data, { type: 'deletePerson', id: 'ion' })
     expect(data).toEqual(snapshot)
   })
+})
+
+test('newId makes a version 4 UUID without crypto.randomUUID', () => {
+  const original = crypto.randomUUID
+  Object.defineProperty(crypto, 'randomUUID', { value: undefined, configurable: true })
+  try {
+    const ids = new Set(Array.from({ length: 200 }, () => newId()))
+    expect(ids.size).toBe(200)
+    for (const id of ids) {
+      expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+    }
+  } finally {
+    Object.defineProperty(crypto, 'randomUUID', { value: original, configurable: true })
+  }
 })

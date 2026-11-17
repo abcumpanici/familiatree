@@ -10,7 +10,14 @@ export default defineConfig({
   reporter: 'list',
   use: { baseURL: `http://localhost:${port}`, trace: 'retain-on-failure' },
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'desktop',
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: `http://familiatree.test:${port}`,
+        launchOptions: { args: ['--host-resolver-rules=MAP familiatree.test 127.0.0.1'] },
+      },
+    },
     { name: 'phone', use: { ...devices['Pixel 7'] } },
     {
       name: 'dev-server',
